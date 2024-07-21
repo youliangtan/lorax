@@ -44,6 +44,29 @@ def init_lora(param_tree, spec, rng, stddev=0.01, dtype=jnp.float32, alpha=1., i
 
     return jax.tree_util.tree_map_with_path(get_param, param_tree, spec, is_leaf=is_leaf)
 
+def combine_params(base_params, adapted_params, spec):
+    """
+    This combines the base params with the adapted lora params
+    and returns a combined lora_params pytree of W + AB
+    """
+    def get_param(path, base, adapt, spec_val):
+        # print(type(adapt), type(qax.EmptyNode))
+        if isinstance(adapt, type(qax.EmptyNode)):
+            # print('EmptyNode!!')
+            return base
+        if jax.tree_util.DictKey("bias") in path:
+            return adapt # the adapted params also stores the updated bias
+        elif jax.tree_util.DictKey("scale") in path:
+            return adapt # the adapted params also stores the updated scale
+        if spec_val in (LORA_FREEZE, LORA_FULL):
+            return base
+        if len(base.shape) == 1:
+            raise ValueError(f'Vectors must either be frozen or fully tuned, but got spec value {spec} for param with path {path}')
+        return LoraWeight(w=base, a=adapt.a, b=adapt.b, alpha=adapt.alpha)
+    return jax.tree_util.tree_map_with_path(
+        get_param, base_params, adapted_params, spec
+    )
+
 def simple_spec(params, decision_fn=None, tune_vectors=False, is_leaf=None):
     """
     Create a simple lora spec for a pytree

@@ -31,6 +31,17 @@ class LoraWeight(qax.ImplicitArray):
 
     def get_scale(self):
         return self.alpha / self.b.shape[-1]
+    
+    @property
+    def T(self):
+        """support transpose"""
+        return LoraWeight(
+            w=self.w.T,
+            a=self.b.T,
+            b=self.a.T,
+            alpha=self.alpha,
+        )
+
 
 def _check_dot_dimension_numbers(dimension_numbers):
     (lhs_contract, rhs_contract), (lhs_batch, rhs_batch) = dimension_numbers
